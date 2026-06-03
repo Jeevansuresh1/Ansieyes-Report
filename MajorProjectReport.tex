@@ -92,6 +92,22 @@
 		\input{./CoverPages/Certificate}
 
 		\newpage
+		\thispagestyle{empty}
+		\begin{center}
+		\vspace*{\fill}
+		\includegraphics[width=0.85\textwidth]{Figures/Jeevan_inter}
+		\vspace*{\fill}
+		\end{center}
+
+		\newpage
+		\thispagestyle{empty}
+		\begin{center}
+		\vspace*{\fill}
+		\includegraphics[width=0.85\textwidth]{Figures/Adnan_inter}
+		\vspace*{\fill}
+		\end{center}
+
+		\newpage
 		\input{./CoverPages/Declaration}
 
 		\newpage
@@ -134,16 +150,16 @@
 		\input{./Chapter1/chapter1-Intro}
 
 		%Chapter 2
-		\input{./Chapter2/chapter2-litsurvey}
-
-		%Chapter 3
 		\input{./Chapter2/chapter2-Funda}
 
-		%Chapter 4
+		%Chapter 3
 		\input{./Chapter4/chapter4-srs}
 
-		%Chapter 5
+		%Chapter 4
 		\input{./Chapter3/chapter3-design}
+
+		%Chapter 5
+		\input{./Chapter5/chapter5-detail-design}
 
 		%Chapter 6
 		\input{./Chapter4/chapter4-implement}
@@ -157,12 +173,6 @@
 		%Chapter 9
 		\input{./Chapter6/chapter6-conclution}
 
-		%% Appendix chapters
-		\appendix
-		\input{./Appendix/ApndxA}
-		\input{./Appendix/ApndxB}
-		\input{./Appendix/ApndxC}
-
 		\backmatter
 		\ifDrf
 		\else
@@ -170,5 +180,11 @@
 		\addcontentsline{toc}{chapter}{Bibliography}
 		\printbibliography%
 		\fi
+
+		%% Appendix chapters
+		\appendix
+		\input{./Appendix/ApndxA}
+		\input{./Appendix/ApndxB}
+		\input{./Appendix/ApndxC}
 	\end{spacing}
 \end{document}

@@ -2,11 +2,11 @@
 
 We evaluated Ansieyes across its four core capabilities: issue classification quality, duplicate detection accuracy, prompt injection defence, and token efficiency of the two-pass architecture. This chapter presents our findings along with a discussion of what worked well and where the system has room for improvement.
 
-\section{\textbf{Experimental Setup}}
+\section{Experimental Setup}
 
 All experiments used Gemini 2.0 Flash as the primary model. The test repository was the Ansieyes codebase itself (roughly 5,000 lines across 25+ source files), supplemented by a curated set of 33 real and synthetic issues. We ran the \gls{ci} pipeline across Python 3.11, 3.12, and 3.13 to confirm cross-version compatibility.
 
-\section{\textbf{Issue Classification}}
+\section{Issue Classification}
 
 We tested the system on 33 issues with manually verified ground-truth labels. Table \ref{tab:classification} breaks down the results by issue type.
 
@@ -68,7 +68,7 @@ The system identified at least one relevant code location for 28 out of 33 issue
 
 At least one proposed solution was present in 97\% of analyses. The retry mechanism caught the remaining 3\% on the second attempt, so after retries, every issue received at least one solution proposal.
 
-\section{\textbf{Duplicate Detection}}
+\section{Duplicate Detection}
 
 We constructed a test set of 20 known duplicate pairs and 30 non-duplicate pairs, then ran both detectors on them.
 
@@ -99,7 +99,7 @@ The Gemini-based detector handled semantic duplicates well---it correctly matche
 
 The cosine detector's lower recall was expected. It struggles with paraphrased descriptions because \gls{tfidf} only captures word-level overlap. However, its near-instant speed makes it useful as a pre-filter in high-volume scenarios: run cosine first to catch the obvious duplicates, then use Gemini for the remaining cases.
 
-\section{\textbf{Prompt Injection Detection}}
+\section{Prompt Injection Detection}
 
 We tested the security module against 50 injection attempts (spread across all seven categories) and 50 benign issue descriptions.
 
@@ -136,7 +136,7 @@ Prompt Leakage & 7 & 7 & 100\% \\
 
 The two missed injections used subtle, context-dependent phrasing that avoided all seven regex categories and fell below the heuristic thresholds. On the benign side, we saw 2 false positives out of 50 (4\%). Both were security-focused issues that naturally contained words like ``bypass'' and ``injection'' in their technical descriptions. This is a known trade-off with keyword-based detection---legitimate security discussions can look suspicious to a pattern matcher.
 
-\section{\textbf{Two-Pass Token Efficiency}}
+\section{Two-Pass Token Efficiency}
 
 Table \ref{tab:tokens} compares token usage between the single-pass and two-pass approaches.
 
@@ -165,7 +165,7 @@ $>$100K LoC & Exceeds limit & 120,000 & --- \\
 
 For small repositories, the two-pass architecture adds overhead (the Librarian pass itself costs tokens) without much benefit. The sweet spot is repositories in the 5K--100K line range, where the Librarian reliably prunes irrelevant files and the Surgeon receives a tightly focused context. For repositories exceeding 100K lines, the single-pass approach is simply not feasible, making the two-pass the only option.
 
-\section{\textbf{Execution Time}}
+\section{Execution Time}
 
 Table \ref{tab:timing} summarises the wall-clock time for each operation.
 
@@ -198,7 +198,7 @@ Full two-pass analysis & 15--45 s \\
 
 The dominant factor in total execution time is the Gemini \gls{api} latency. The security check and cosine duplicate detection add negligible overhead. Even the full two-pass analysis completes within a minute, which is well within the timeout limits of GitHub Actions workflows.
 
-\section{\textbf{CI Pipeline}}
+\section{CI Pipeline}
 
 All unit tests pass across Python 3.11, 3.12, and 3.13. Code formatting (Black), import ordering (isort), and linting (Flake8) checks also pass consistently. The parallel test matrix catches version-specific issues early---we encountered one such issue with a Pydantic behaviour change in Python 3.13 and fixed it before it reached production.
 

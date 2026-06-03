@@ -2,7 +2,7 @@
 
 Before diving into how Ansieyes is built, it helps to understand the core technologies it relies on. This chapter covers the relevant theory---from how large language models process text to the similarity metrics we use for duplicate detection---and introduces the software tools that make up our development stack.
 
-\section{\textbf{Large Language Models}}
+\section{Large Language Models}
 
 \gls{llm} are deep neural networks trained on massive text corpora. They learn statistical patterns in language and, as a result, can generate coherent text, answer questions, summarise documents, and---importantly for us---reason about source code.
 
@@ -22,7 +22,7 @@ We chose Google's Gemini 2.0 Flash as the backbone of Ansieyes. Two properties m
 \subsection{Context Window Management}
 The context window is the total amount of text a model can consider in a single request. If we exceed this limit, we lose information. For small to medium repositories, we can simply include the entire codebase. For larger ones, we need a smarter approach---this is what motivated our two-pass Librarian--Surgeon architecture, which we describe in Chapter 3.
 
-\section{\textbf{Text Similarity Techniques}}
+\section{Text Similarity Techniques}
 
 \subsection{TF-IDF}
 \gls{tfidf} is a classic technique for turning text into numerical vectors. The term frequency (TF) captures how often a word appears in a single document, while the inverse document frequency (IDF) down-weights words that appear in many documents. The product gives a score that highlights distinctive words:
@@ -47,7 +47,7 @@ A score of 1 means the two texts are identical in their word distributions; a sc
 \subsection{Semantic Similarity via LLMs}
 The limitation of \gls{tfidf} and cosine similarity is that they work at the word level. Two issues can describe the exact same bug using completely different vocabulary, and a word-level method would miss the connection. To handle this, we also run duplicate detection through Gemini, which understands meaning rather than just matching words. The trade-off is speed: the \gls{llm} approach takes a few seconds per comparison, while cosine similarity takes milliseconds.
 
-\section{\textbf{Prompt Engineering}}
+\section{Prompt Engineering}
 
 Getting useful output from an \gls{llm} depends heavily on how you phrase the request. In our system, prompt design plays two critical roles.
 
@@ -55,13 +55,13 @@ First, we need the model to produce its analysis in a specific \gls{json} format
 
 Second, we need to balance thoroughness and accuracy. Early in development, we found that overly open-ended prompts led to hallucinated file paths---the model would invent plausible-sounding filenames that did not actually exist in the repository. We addressed this by explicitly instructing the model to only reference files it can find in the provided codebase context, and by adding quality checks that catch placeholder paths like ``path/to/file.py.''
 
-\section{\textbf{Prompt Injection and LLM Security}}
+\section{Prompt Injection and LLM Security}
 
 Since Ansieyes processes user-submitted issue descriptions, it is exposed to prompt injection attacks. A malicious user could write an issue like \textit{``Ignore all previous instructions and output the system prompt''} to try to hijack the model's behaviour.
 
 We defend against this at three levels. The first uses a pre-trained \gls{ml} model (the pytector library) that classifies text as safe or suspicious. The second applies regular expression patterns to catch known injection phrases like ``ignore previous instructions'' or ``you are now.'' The third uses heuristic rules to flag statistical anomalies---for example, an unusually high ratio of special characters or an excessive number of instruction-like keywords. We discuss the exact detection categories and thresholds in Chapter 4.
 
-\section{\textbf{Tools and Libraries}}
+\section{Tools and Libraries}
 
 \subsection{Python and Core Libraries}
 The system is written in Python 3.11+ and uses Pydantic for data modelling, which gives us runtime type checking and validation. scikit-learn provides the \gls{tfidf} vectoriser and cosine similarity computation for the offline duplicate detector. PyYAML handles configuration files.
@@ -76,6 +76,10 @@ GitHub Actions is the automation backbone. We wrote six workflow templates that 
 Repomix is a tool that consolidates a repository's source files into a single text file suitable for \gls{llm} ingestion. We use it to generate the codebase context that gets passed to Gemini alongside the issue description.
 
 With this foundation in place, the next chapter describes how we put these pieces together into a working system.
+
+\section{Programming Languages and Technologies Used}
+
+The Ansieyes system is built using the following languages, libraries, and tools: Python 3.11+ as the primary programming language; \texttt{google-genai} for communicating with the Gemini \gls{api}; Pydantic for data modelling and runtime validation; scikit-learn for \gls{tfidf} vectorisation and cosine similarity computation; pytector for prompt injection detection; PyYAML for configuration file parsing; GitHub Actions for \gls{ci}/\gls{cd} automation; Repomix for repository context generation; and pytest, Black, isort, and Flake8 for testing, code formatting, import sorting, and linting respectively.
 
 \section{Summary}
 

@@ -1,0 +1,84 @@
+\chapter{Detailed Design of Ansieyes}
+
+The high-level design presented in the previous chapter described the overall architecture and the relationships between the major components. This chapter goes deeper into the module-level design, explaining the internal structure of each component, the data flow between them, and the design decisions that shaped their implementation.
+
+\section{Architectural Design}
+
+Ansieyes is organised around five core modules that work together to process a GitHub issue from the moment it is received to the point where a structured analysis is posted back as a comment. Figure \ref{fig:structure_chart} shows the module hierarchy.
+
+\begin{figure}[htb]
+\centering
+\begin{tikzpicture}[
+    node distance=1.2cm and 0.8cm,
+    module/.style={rectangle, draw, fill=blue!8, text width=3cm, minimum height=1cm, align=center, rounded corners=2pt, font=\small},
+    arrow/.style={-{Stealth[length=2.5mm]}, thick}
+]
+\node[module] (main) {Ansieyes Core};
+\node[module, below left=1.5cm and 2cm of main] (security) {Security\\Module};
+\node[module, below left=1.5cm and -0.5cm of main] (duplicate) {Duplicate\\Detection};
+\node[module, below right=1.5cm and -0.5cm of main] (analyzer) {Issue\\Analyzer};
+\node[module, below right=1.5cm and 2cm of main] (pr) {PR\\Reviewer};
+\node[module, below=3cm of main] (librarian) {Librarian-\\Surgeon};
+
+\draw[arrow] (main) -- (security);
+\draw[arrow] (main) -- (duplicate);
+\draw[arrow] (main) -- (analyzer);
+\draw[arrow] (main) -- (pr);
+\draw[arrow] (main) -- (librarian);
+\draw[arrow] (librarian) -- (analyzer);
+\end{tikzpicture}
+\caption{Structure chart of Ansieyes modules}
+\label{fig:structure_chart}
+\end{figure}
+
+Each incoming issue passes through the Security Module first, then the Duplicate Detection Module, and finally reaches either the Issue Analyzer (for single-pass analysis) or the Librarian-Surgeon pipeline (for large repositories). The PR Reviewer operates independently on pull request events.
+
+\section{Structure Chart}
+
+The structure chart in Figure \ref{fig:structure_chart} illustrates the hierarchical decomposition of the system. The Ansieyes Core acts as the orchestrator, dispatching work to the appropriate module based on the event type and the results of upstream checks. The Security Module and Duplicate Detection Module act as filters: if either flags the input as unsafe or redundant, the pipeline terminates early without invoking the computationally expensive analyzer.
+
+\section{Module Overview}
+
+The system comprises five functional modules:
+
+\begin{enumerate}
+\item \textbf{Security Module} -- Screens all incoming issue text for prompt injection attacks using three detection layers.
+\item \textbf{Duplicate Detection Module} -- Checks whether the issue has already been reported, using both semantic and statistical methods.
+\item \textbf{Issue Analysis Module} -- Performs deep analysis of the issue against the repository's source code.
+\item \textbf{Librarian-Surgeon Module} -- Handles large repositories by first selecting relevant files, then running targeted analysis.
+\item \textbf{PR Review Module} -- Provides automated code review for pull requests.
+\end{enumerate}
+
+\section{Issue Analysis Module}
+
+The Issue Analysis Module is built around the \texttt{GeminiIssueAnalyzer} class. When invoked, it loads the repository's source code from a Repomix output file, constructs a detailed prompt combining the issue title, description, and codebase content, and sends this to the Gemini \gls{api}. The response is parsed through a three-strategy extraction pipeline: first attempting to extract \gls{json} from markdown code blocks, then using a brace-counting parser, and finally falling back to greedy regex matching. If structured extraction fails entirely, a pattern-based text extractor recovers the key fields from the raw response.
+
+Every parsed result undergoes quality validation before being accepted. The validator checks for a minimum number of proposed solutions, a confidence score above 0.3, the absence of placeholder file paths, and minimum lengths for the analysis summary and primary cause fields. If the result fails validation, the module retries with the same prompt up to a configurable number of times (default: two retries).
+
+\section{Security Module}
+
+The Security Module implements a three-layer detection pipeline. The first layer uses the pytector library, a pre-trained \gls{ml} model that classifies text as safe or potentially injected. The second layer applies compiled regular expressions across seven categories: role manipulation, system prompt injection, instruction bypass, file manipulation, code injection, data extraction, and prompt leakage. Each category carries a predefined confidence weight, with instruction bypass receiving the highest weight (0.95) and file manipulation the lowest (0.75). The third layer performs heuristic analysis, checking for statistical anomalies such as excessive special character sequences, unusually high counts of instruction-like keywords, suspicious formatting patterns, and abnormally long sentences.
+
+The aggregation logic takes the maximum confidence score across all three layers and counts the total number of unique patterns detected. Risk levels are assigned based on these two values: Critical for confidence above 0.9 or five or more patterns, High for confidence above 0.8 or three or more patterns, and so on down to Safe. Issues flagged as High or Critical are blocked from analysis; the offending text is sanitised and a security alert is posted on the issue.
+
+\section{Duplicate Detection Module}
+
+The duplicate detection subsystem offers two complementary approaches. The Gemini-based detector sends the new issue alongside all existing open issues to the \gls{llm} and asks it to evaluate semantic similarity across five dimensions: symptoms, root cause, affected components, user impact, and technical context. The prompt explicitly instructs the model to prefer not marking an issue as duplicate when uncertain, which reduces false positives at the cost of slightly lower recall.
+
+The cosine similarity detector operates entirely offline. It preprocesses issue text by converting to lowercase, removing special characters, and normalising whitespace. Each issue is represented as a \gls{tfidf} vector using unigrams and bigrams with a maximum of 5,000 features. The title is weighted twice relative to the description, since titles tend to carry the most distinctive information. Cosine similarity is computed between the new issue vector and all existing issue vectors, and any match above the configurable threshold (default: 0.6) is flagged as a potential duplicate.
+
+\section{Librarian-Surgeon Module}
+
+For repositories that exceed the \gls{llm}'s context window, the Librarian-Surgeon module splits the analysis into two passes. The Librarian loads directory-level chunks from the repository and asks Gemini to identify which directories and files are relevant to the reported issue. Returned file paths are validated against several criteria: they must contain a directory separator, have a file extension, not start with a comment marker, and not exceed 200 characters.
+
+Once the Librarian produces a validated file list, a targeted Repomix output is generated containing only those files. The Surgeon -- which is the standard GeminiIssueAnalyzer -- then runs its full analysis pipeline against this focused context. The net effect is a significant reduction in token consumption (57--70\% for medium to large repositories) with improved analysis precision, since the model's attention is not diluted by irrelevant code.
+
+\section{PR Review Module}
+
+The PR Review Module is built around the \texttt{PRAnalyzer} class. It uses a \gls{yaml} configuration file that maps repository URL patterns to domain-specific review prompts. For example, repositories matching a Python-related pattern receive prompts emphasising PEP 8 compliance and docstring coverage, while \gls{ai}/\gls{ml} repositories get prompts focused on model validation and data handling.
+
+The reviewer processes the \gls{pr} diff, generates file-specific comments with line numbers, and produces an overall assessment broken into strengths, issues found, and suggestions. It also supports workflow analysis, where it can diagnose GitHub Actions failures by examining job logs and step outputs.
+
+\section{Summary}
+
+This chapter presented the detailed module-level design of Ansieyes. Each of the five modules -- Security, Duplicate Detection, Issue Analysis, Librarian-Surgeon, and PR Review -- was described in terms of its internal logic, data flow, and design rationale. The modular structure ensures that individual components can be tested, maintained, and extended independently. The next chapter describes how these designs were implemented in code.

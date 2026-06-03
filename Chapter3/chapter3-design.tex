@@ -2,7 +2,7 @@
 
 Having covered the theory, we now describe how Ansieyes is structured. The design had to satisfy three goals simultaneously: deliver accurate analysis for typical repositories, remain secure against adversarial inputs, and scale to large codebases without exceeding the \gls{llm}'s context limits. We addressed these through a layered architecture with clearly separated responsibilities.
 
-\section{\textbf{Architecture Overview}}
+\section{Architecture Overview}
 
 Ansieyes is organised into four layers, each handling a distinct phase of the analysis pipeline. Figure \ref{fig:architecture} shows how they connect.
 
@@ -28,6 +28,26 @@ Ansieyes is organised into four layers, each handling a distinct phase of the an
 \label{fig:architecture}
 \end{figure}
 
+Figure \ref{fig:dfd0} presents the DFD-0 context diagram of Ansieyes, showing how the system interacts with external entities such as GitHub, the developer, the Gemini AI model, the target repository, and the security modules.
+
+\begin{figure}[htb]
+\centering
+\includegraphics[width=0.95\textwidth]{Figures/report_image_1}
+\caption{DFD-0 of Ansieyes AI-Powered Issue Triage and PR Review System Context Diagram}
+\vspace{2mm}
+\label{fig:dfd0}
+\end{figure}
+
+Figure \ref{fig:dfd1} decomposes the system further into its internal processes: the Webhook Handler, Prompt Injection Detector, Duplicate Detector, Issue Triager (Librarian + Surgeon), PR Reviewer, Auto-Fixer, and Output Formatter.
+
+\begin{figure}[htb]
+\centering
+\includegraphics[width=0.95\textwidth]{Figures/report_image_2}
+\caption{DFD-1 of Ansieyes AI-Powered Issue Triage and PR Review System Decomposition}
+\vspace{2mm}
+\label{fig:dfd1}
+\end{figure}
+
 \subsection{Trigger Layer}
 The entry point is a set of GitHub Actions workflows that listen for repository events. When a new issue is created, a workflow fires and kicks off the analysis pipeline. We provide six workflow configurations to suit different team preferences:
 
@@ -49,7 +69,7 @@ Three specialised analysers live in this layer. The GeminiIssueAnalyser (which w
 \subsection{Data Models Layer}
 All analysis outputs are defined as Pydantic models, which enforce type safety and value constraints at runtime. If the \gls{llm} produces a confidence score outside the 0--1 range, for example, Pydantic catches it before the result reaches the user.
 
-\section{\textbf{Data Model Design}}
+\section{Data Model Design}
 
 We defined five core models to represent the system's outputs. Table \ref{tab:models} summarises their key fields.
 
@@ -80,7 +100,7 @@ InjectionResult & is\_injection, risk\_level, confidence\_score, detected\_patte
 
 The IssueAnalysis model deserves a closer look. Its \texttt{issue\_type} field accepts one of three values: bug, enhancement, or feature\_request. The \texttt{severity} field ranges from low to critical. The \texttt{root\_cause\_analysis} is itself a nested object containing the primary cause as text, a list of contributing factors, a list of affected components, and a list of code locations (each with file path, line number, function name, and class name). Proposed solutions follow a similar structure, with each solution specifying where in the code the change should be made and why.
 
-\section{\textbf{Two-Pass Librarian--Surgeon Architecture}}
+\section{Two-Pass Librarian--Surgeon Architecture}
 
 For small to medium repositories, loading the entire codebase into a single Gemini prompt works well. But enterprise-scale projects can have hundreds of thousands of lines of code, far more than the model can process at once. Even for projects that technically fit, stuffing irrelevant code into the context dilutes the model's attention and wastes tokens.
 
@@ -123,7 +143,7 @@ A new Repomix output is generated containing only the files the Librarian identi
 \subsection{Token Savings}
 If a repository has $N$ files in total and the Librarian selects $R$ of them, the token reduction is approximately $1 - R/N$. In practice, we observed reductions between 57\% and 70\% on medium to large repositories. For very large codebases that exceed the single-pass context limit entirely, the two-pass approach is the only option.
 
-\section{\textbf{Security Architecture}}
+\section{Security Architecture}
 
 We designed the security module as three independent detectors whose outputs are aggregated. Figure \ref{fig:security} illustrates the pipeline.
 
@@ -158,7 +178,7 @@ We designed the security module as three independent detectors whose outputs are
 
 The aggregator takes the highest risk level reported by any individual detector. This conservative strategy means that even if an attacker manages to slip past one layer, the others can still catch the attempt. Risk levels range from Safe through Low, Medium, and High to Critical. Issues flagged as High or Critical are blocked from analysis entirely; Low and Medium risks proceed with a warning.
 
-\section{\textbf{Duplicate Detection Design}}
+\section{Duplicate Detection Design}
 
 We offer two approaches, each with its own trade-offs.
 
@@ -166,7 +186,7 @@ The \textbf{Gemini-based} detector sends the new issue along with all existing o
 
 The \textbf{cosine similarity} detector works offline. It preprocesses issue text (lowercasing, removing special characters), builds \gls{tfidf} vectors with unigram and bigram features, and computes cosine similarity. We weight the title 2x relative to the description, since titles tend to carry the most distinctive information. Issues above a 0.6 similarity threshold are flagged. This method is fast (under 100 milliseconds) but misses semantic duplicates that use different words.
 
-\section{\textbf{PR Review Design}}
+\section{PR Review Design}
 
 The pull request reviewer extends Ansieyes to code review. It uses a \gls{yaml} configuration file that maps repository URL patterns (for example, repositories with ``python'' in the name) to specialised review prompts. The reviewer analyses the \gls{pr} diff, generates file-specific comments with line numbers, and produces an overall assessment broken into strengths, issues, and suggestions.
 
