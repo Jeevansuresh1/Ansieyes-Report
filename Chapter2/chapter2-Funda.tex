@@ -24,6 +24,8 @@ The context window is the total amount of text a model can consider in a single 
 
 \section{Text Similarity Techniques}
 
+At the heart of any duplicate detection system lies the ability to measure how similar two pieces of text really are. In the context of issue triage, this means comparing the title and description of a newly opened issue against every existing issue in the repository to determine whether someone has already reported the same problem. If two bug reports describe the same crash but use different wording, we still want to catch that overlap. Text similarity techniques give us a principled way to quantify the closeness between two documents---whether through raw word overlap or deeper semantic understanding. The methods we describe in this section form the backbone of our hybrid duplicate detection module, which combines fast offline scoring with \gls{llm}-based semantic checks to balance speed and accuracy.
+
 \subsection{TF-IDF}
 \gls{tfidf} is a classic technique for turning text into numerical vectors. The term frequency (TF) captures how often a word appears in a single document, while the inverse document frequency (IDF) down-weights words that appear in many documents. The product gives a score that highlights distinctive words:
 
@@ -62,6 +64,8 @@ Since Ansieyes processes user-submitted issue descriptions, it is exposed to pro
 We defend against this at three levels. The first uses a pre-trained \gls{ml} model (the pytector library) that classifies text as safe or suspicious. The second applies regular expression patterns to catch known injection phrases like ``ignore previous instructions'' or ``you are now.'' The third uses heuristic rules to flag statistical anomalies---for example, an unusually high ratio of special characters or an excessive number of instruction-like keywords. We discuss the exact detection categories and thresholds in Chapter 4.
 
 \section{Tools and Libraries}
+
+Ansieyes is built on a carefully selected stack of open-source tools and libraries, each chosen for a specific role in the pipeline. Rather than relying on a single monolithic framework, we assembled a set of lightweight, well-maintained components that work together cleanly. The \gls{llm} interaction, data validation, text similarity computation, security scanning, and \gls{ci}/\gls{cd} automation are each handled by a dedicated library or platform. This modular approach means that if we ever need to swap out one component---say, switching from one \gls{llm} provider to another---we can do so without rewriting the rest of the system. The following subsections describe each tool and the role it plays in the overall architecture.
 
 \subsection{Python and Core Libraries}
 The system is written in Python 3.11+ and uses Pydantic for data modelling, which gives us runtime type checking and validation. scikit-learn provides the \gls{tfidf} vectoriser and cosine similarity computation for the offline duplicate detector. PyYAML handles configuration files.

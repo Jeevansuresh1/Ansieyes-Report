@@ -63,6 +63,8 @@ The system shall integrate with GitHub Actions to enable automated triage on iss
 
 \section{Non-Functional Requirements}
 
+While functional requirements define what the system does, non-functional requirements define how well it does it. For a tool like Ansieyes that sits in the critical path of a development workflow, these qualities matter just as much as the features themselves. A triage system that produces correct results but takes five minutes per issue, or one that crashes whenever the \gls{api} returns an unexpected response, would quickly be abandoned by its users. The requirements below capture our expectations around response time, fault tolerance, scalability across different repository sizes, ease of use, and long-term maintainability of the codebase. Each requirement was informed by our experience during prototyping and by observing how real teams interact with automated tooling in their \gls{ci}/\gls{cd} pipelines.
+
 \subsection{Performance}
 
 The system shall complete issue analysis and classification within 30 seconds for repositories containing up to 10{,}000 files. Duplicate detection shall return results within 15 seconds for repositories with up to 500 existing issues. The two-pass Librarian-Surgeon architecture ensures that \gls{llm} calls remain within acceptable latency bounds by reducing the context size fed to the Surgeon.
@@ -85,13 +87,15 @@ The codebase shall follow a modular architecture with clear separation between t
 
 \section{Hardware Requirements}
 
+One of the practical advantages of Ansieyes is that it offloads all heavy computation---specifically the \gls{llm} inference---to Google's cloud-hosted Gemini \gls{api}. This means the local machine running the system does not need a powerful \gls{gpu} or large amounts of memory. The main local workloads are \gls{tfidf} vectorisation, cosine similarity computation, and the prompt injection detection checks, all of which are lightweight by modern standards. That said, we still document minimum and recommended specifications below to give users a clear idea of what to expect when deploying the system on their own infrastructure or \gls{ci}/\gls{cd} runners.
+
 \subsection{Minimum Requirements}
 
 \begin{table}[H]
 \centering
 \renewcommand{\arraystretch}{1.3}
 \setlength{\arrayrulewidth}{0.5mm}
-\caption{\textbf{Minimum Hardware Requirements}}
+\caption[Minimum Hardware Requirements]{\textbf{Minimum Hardware Requirements}}
 \vspace{2mm}
 \begin{tabular}{|p{4cm}|p{8cm}|}
 \hline
@@ -114,7 +118,7 @@ Network & Stable internet connection for \gls{api} calls \\
 \centering
 \renewcommand{\arraystretch}{1.3}
 \setlength{\arrayrulewidth}{0.5mm}
-\caption{\textbf{Recommended Hardware Requirements}}
+\caption[Recommended Hardware Requirements]{\textbf{Recommended Hardware Requirements}}
 \vspace{2mm}
 \begin{tabular}{|p{4cm}|p{8cm}|}
 \hline
@@ -139,7 +143,7 @@ Since the core \gls{llm} inference is offloaded to Google's Gemini \gls{api}, th
 \centering
 \renewcommand{\arraystretch}{1.3}
 \setlength{\arrayrulewidth}{0.5mm}
-\caption{\textbf{Software Requirements}}
+\caption[Software Requirements]{\textbf{Software Requirements}}
 \vspace{2mm}
 \begin{tabular}{|p{4.5cm}|p{7.5cm}|}
 \hline

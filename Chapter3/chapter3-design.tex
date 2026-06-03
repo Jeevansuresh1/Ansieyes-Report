@@ -23,7 +23,7 @@ Ansieyes is organised into four layers, each handling a distinct phase of the an
 \draw[arrow] (security) -- (analysis);
 \draw[arrow] (analysis) -- (data);
 \end{tikzpicture}
-\caption{Layered architecture of Ansieyes}
+\caption[Layered architecture of Ansieyes]{\textbf{Layered architecture of Ansieyes}}
 \vspace{2mm}
 \label{fig:architecture}
 \end{figure}
@@ -32,8 +32,8 @@ Figure \ref{fig:dfd0} presents the DFD-0 context diagram of Ansieyes, showing ho
 
 \begin{figure}[htb]
 \centering
-\includegraphics[width=0.95\textwidth]{Figures/report_image_1}
-\caption{DFD-0 of Ansieyes AI-Powered Issue Triage and PR Review System Context Diagram}
+\includegraphics[width=1.0\textwidth]{Figures/report_image_1}
+\caption[DFD-0 of Ansieyes AI-Powered Issue Triage and PR Review System Context Diagram]{\textbf{DFD-0 of Ansieyes AI-Powered Issue Triage and PR Review System Context Diagram}}
 \vspace{2mm}
 \label{fig:dfd0}
 \end{figure}
@@ -42,8 +42,8 @@ Figure \ref{fig:dfd1} decomposes the system further into its internal processes:
 
 \begin{figure}[htb]
 \centering
-\includegraphics[width=0.95\textwidth]{Figures/report_image_2}
-\caption{DFD-1 of Ansieyes AI-Powered Issue Triage and PR Review System Decomposition}
+\includegraphics[width=1.0\textwidth]{Figures/report_image_2}
+\caption[DFD-1 of Ansieyes AI-Powered Issue Triage and PR Review System Decomposition]{\textbf{DFD-1 of Ansieyes AI-Powered Issue Triage and PR Review System Decomposition}}
 \vspace{2mm}
 \label{fig:dfd1}
 \end{figure}
@@ -69,6 +69,12 @@ Three specialised analysers live in this layer. The GeminiIssueAnalyser (which w
 \subsection{Data Models Layer}
 All analysis outputs are defined as Pydantic models, which enforce type safety and value constraints at runtime. If the \gls{llm} produces a confidence score outside the 0--1 range, for example, Pydantic catches it before the result reaches the user.
 
+\subsection{Configuration Management}
+Rather than hardcoding parameters throughout the codebase, Ansieyes centralises its configuration into two files. The first, \texttt{triage.config.json}, controls the analysis pipeline---it specifies the Gemini model to use, the similarity threshold for duplicate detection, the maximum file count for single-pass mode, and feature flags for enabling or disabling specific modules. The second, \texttt{pr\_prompt\_config.yml}, maps repository URL patterns to specialised \gls{pr} review prompts so that a Python project gets different review criteria than, say, a JavaScript frontend. This separation means that teams can tune Ansieyes for their specific workflow without touching any source code; they simply edit the relevant configuration file and the changes take effect on the next run.
+
+\subsection{Workflow Orchestration}
+The six GitHub Actions workflows described in the Trigger Layer do not operate in isolation---they form a coordinated pipeline. The issue analysis workflow triggers first and posts its results as a comment; if duplicate detection is enabled, the duplicate detection workflow runs in parallel and adds a separate label and comment. The bulk re-analysis workflow listens for \gls{pr} merge events and re-triggers analysis on all open issues so that triage results stay current with the latest code. The \gls{pr} review workflow operates on its own event stream. Coordination between these workflows is handled through GitHub's native event system and shared labels, which means no external orchestration service is needed. This design keeps the deployment simple---repository owners just copy the workflow files into their \texttt{.github/workflows} directory and set the required secrets.
+
 \section{Data Model Design}
 
 We defined five core models to represent the system's outputs. Table \ref{tab:models} summarises their key fields.
@@ -78,7 +84,7 @@ We defined five core models to represent the system's outputs. Table \ref{tab:mo
 \renewcommand{\arraystretch}{1.3}
 \setlength{\arrayrulewidth}{0.5mm}
 \fontsize{10}{12}\selectfont
-\caption{\textbf{Core data models and their fields}}
+\caption[Core data models and their fields]{\textbf{Core data models and their fields}}
 \vspace{2mm}
 \label{tab:models}
 \begin{tabular}{|p{3.8cm}|p{8cm}|}
@@ -129,7 +135,7 @@ Our solution splits the analysis into two passes, as shown in Figure \ref{fig:tw
 \draw[arrow] (context) -- (surgeon);
 \draw[arrow] (surgeon) -- (output);
 \end{tikzpicture}
-\caption{Two-pass Librarian--Surgeon flow}
+\caption[Two-pass Librarian--Surgeon flow]{\textbf{Two-pass Librarian--Surgeon flow}}
 \vspace{2mm}
 \label{fig:twopass}
 \end{figure}
@@ -171,7 +177,7 @@ We designed the security module as three independent detectors whose outputs are
 \draw[arrow] (heuristic) -- (agg);
 \draw[arrow] (agg) -- (result);
 \end{tikzpicture}
-\caption{Multi-layered prompt injection detection pipeline}
+\caption[Multi-layered prompt injection detection pipeline]{\textbf{Multi-layered prompt injection detection pipeline}}
 \vspace{2mm}
 \label{fig:security}
 \end{figure}
