@@ -70,8 +70,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%% Bibliography %%%%%%%%%%%%%%%%%%%%%
-\usepackage[backend=bibtex,style=ieee]{biblatex}
-\addbibresource{./AuxFiles/ProjectBib.bib}
+%% Using hardcoded thebibliography instead of biblatex for compatibility
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%WaterMark%%%%%%%%%%%%%%%%%%%%%
@@ -178,7 +177,7 @@
 		\else
 		\clearpage
 		\addcontentsline{toc}{chapter}{Bibliography}
-		\printbibliography%
+		\input{./AuxFiles/Bibliography}
 		\fi
 
 		%% Appendix chapters
