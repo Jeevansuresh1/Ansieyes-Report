@@ -1,7 +1,7 @@
 \chapter{Introduction to Ansieyes}
 Software teams working on open-source projects face a growing challenge: the sheer number of issues that users and contributors file every day. A popular repository on GitHub can easily accumulate dozens of new issues in a single week, each one requiring someone to read it, figure out whether it describes a bug or a feature request, gauge how urgent it is, and ideally point to the part of the codebase that needs attention. Doing all of this by hand does not scale. In this chapter, we lay out the background behind Ansieyes and define the objectives that guided our work.
 
-\section[Introduction]{\textbf{Introduction}}
+\section{Introduction to Ansieyes}
 Issue trackers are one of the most important coordination tools in software development. GitHub alone hosts over 100 million repositories, and the most active among them receive hundreds of issues per month. When an issue arrives, a maintainer typically reads its title and description, decides whether it is a bug, an enhancement, or a feature request, assigns a severity label, and routes it to the right person. In small teams this works well enough, but once a project grows beyond a handful of contributors the bottleneck becomes obvious.
 
 Several factors make manual triage particularly hard. First, the person doing it needs to be familiar with the codebase---knowing which module handles authentication, which file parses configuration, and so on. Second, many issues are vaguely written, requiring the triager to mentally connect a user-reported symptom to an actual code path. Third, duplicates are surprisingly common; users often report the same underlying bug using very different words, and spotting the overlap requires remembering or searching through older issues.
@@ -10,17 +10,31 @@ Over the past two years, \gls{llm} have shown strong abilities in both natural l
 
 Ansieyes is our attempt to turn this idea into a working system. It takes a GitHub issue and the repository's source code as input, runs them through Gemini 2.0 Flash, and produces a structured output that includes the issue type, severity, a root cause analysis pointing to specific files and functions, and one or more proposed fixes. We also built layers around this core---duplicate detection, prompt injection defence, and a two-pass architecture for large codebases---to make the tool practical for real-world use.
 
-\section[Motivation]{\textbf{Motivation}}
+\section{Literature Review}
+
+The literature related to the project can be grouped into five major areas: issue classification using machine learning, duplicate detection in bug repositories, \gls{llm} for code understanding, prompt injection and \gls{llm} security, and automated triage tools. These areas collectively explain why a context-aware, secure, and scalable triage system is needed for modern software repositories.
+
+Early issue classification research established that text-based features carry enough signal for automated triage. Antoniol et al. \cite{Antoniol2008} applied \gls{tfidf} vectors with Naive Bayes and Logistic Regression to distinguish bugs from enhancements, reporting accuracies between 77\% and 82\%. Menzies and Marcus \cite{Menzies2008} addressed severity assignment and showed that feature selection mattered more than classifier choice. Later, Kallis et al. \cite{Kallis2019} built Ticket Tagger using fastText embeddings, achieving F1 scores around 0.84 on GitHub repositories. Deep learning approaches using \gls{cnn} \cite{Lee2017} and \gls{bert}-based models further improved accuracy by learning semantic representations directly from text. Despite these gains, all methods operated purely on issue text without any reference to the source code, limiting their ability to explain classifications or suggest fixes.
+
+Duplicate detection has evolved from keyword-based retrieval to semantic neural approaches. Sun et al. \cite{Sun2011} used \gls{bm25} with topic models on Mozilla and Eclipse repositories, reaching recall rates of 50--68\%. Deshmukh et al. \cite{Deshmukh2017} improved results by combining \gls{tfidf} cosine similarity with structural features like stack traces. Rodrigues et al. \cite{Rodrigues2020} achieved the best benchmark results using Siamese neural networks with \gls{bert} embeddings. In Ansieyes, we combine two complementary strategies: a fast \gls{tfidf} cosine method for pre-screening and a Gemini-based semantic comparison for confirmation.
+
+The application of \gls{llm} to code understanding has opened new possibilities. Chen et al. \cite{Chen2021} demonstrated with Codex that \gls{llm} can generate correct programs from natural language descriptions. Feng et al. \cite{Feng2020} introduced CodeBERT, a bimodal model pre-trained on both code and text. Zhang et al. \cite{Zhang2023} found that GPT-4's code review quality approached that of human reviewers, though hallucination remained a concern. These results gave us confidence that Gemini could handle the combined task of understanding an issue and reasoning about the codebase.
+
+Prompt injection poses a direct threat to systems that feed untrusted input to \gls{llm}. Perez and Ribeiro \cite{Perez2022} catalogued injection techniques including instruction overrides and context manipulation. Greshake et al. \cite{Greshake2023} demonstrated indirect injection through external data sources---precisely the threat model that applies to Ansieyes, where malicious users could craft issue descriptions to manipulate the model. These findings convinced us that a dedicated security layer was essential.
+
+The key gap across all existing work is fragmentation: each tool addresses one facet of triage without connecting the dots. No prior system combines classification with root cause analysis, solution generation, duplicate detection, and security in a single pipeline. Ansieyes was designed to fill this gap.
+
+\section{Motivation}
 
 We started this project after noticing how much time open-source maintainers spend on repetitive triage work. In our own experience contributing to repositories, we saw issues sit unclassified for days simply because no one with enough context was available to look at them. At the same time, we observed that Gemini and similar models had become good enough at understanding code to make automated analysis feasible---something that was not practical even two years ago.
 
 The specific gap we wanted to fill was the connection between an issue description and the codebase. Existing label bots can tell you that something is probably a bug based on keywords like ``crash'' or ``error,'' but they cannot tell you \textit{which function} is likely at fault or \textit{what a fix might look like}. We believed that feeding the full source code to a model with a large context window could bridge this gap.
 
-\section[Problem statement]{\textbf{Problem statement}}
+\section{Problem Statement}
 
 Manually triaging issues in active software repositories is slow, inconsistent, and does not scale. Current automation tools offer shallow classification without codebase context, cannot trace root causes, and are vulnerable to adversarial inputs when backed by \gls{llm}. There is a need for an integrated system that can classify, analyse, and propose fixes for issues while remaining secure and scalable.
 
-\section[Objectives]{\textbf{Objectives}}
+\section{Objectives}
 The objectives of this project are:
 \begin{enumerate}
 \item To build an issue analysis system that uses Google's Gemini \gls{llm} to classify issues, identify root causes in the source code, and propose concrete solutions.
@@ -28,7 +42,7 @@ The objectives of this project are:
 \item To design a two-pass analysis architecture (Librarian--Surgeon) that scales the system to large repositories by selecting only the relevant source files for deep analysis.
 \end{enumerate}
 
-\section[Brief Methodology of the project]{\textbf{Brief Methodology of the project}}
+\section{Methodology of the project}
 We followed an iterative development approach, building and testing each module independently before integrating them into the full pipeline. The broad sequence of work was:
 
 \begin{enumerate}
@@ -66,7 +80,7 @@ Figure \ref{fig:methodology} provides an overview of this workflow.
 \label{fig:methodology}
 \end{figure}
 
-\section[Assumptions made / Constraints of the project]{\textbf{Assumptions made / Constraints of the project}}
+\section{Constraints of the project}
 
 Our work operates under a few assumptions and practical constraints:
 \begin{enumerate}
@@ -77,7 +91,7 @@ Our work operates under a few assumptions and practical constraints:
 \item The accuracy of root cause mapping depends on how complete the codebase snapshot is---if key files are excluded from the Repomix output, the model may miss them.
 \end{enumerate}
 
-\section[Organization of the report]{\textbf{Organization of the report}}
+\section{Organization of the report}
 
 The rest of this report is organised as follows:
 \begin{itemize}
