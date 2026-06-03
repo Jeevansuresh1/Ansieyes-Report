@@ -1,0 +1,97 @@
+\chapter{Literature Survey}
+
+\section{\textbf{Introduction}}
+
+In this chapter, we present a detailed survey of the research that informed the design of Ansieyes. The previous chapter introduced the problem of manual issue triage and outlined our objectives; here, we examine how prior work has tackled the individual sub-problems---issue classification, duplicate detection, code understanding, and security---and identify the gaps that our system aims to fill.
+
+We organised this survey around six areas. We begin with traditional \gls{ml}-based approaches to issue classification, then move to deep learning and \gls{ai} methods that improved on them. Next, we cover duplicate detection techniques, followed by the recent wave of \gls{llm}-based code analysis tools. We also review the growing body of work on prompt injection and \gls{llm} security, since our system processes untrusted user input. Finally, we look at existing automated triage tools in practice and summarise the research gaps that motivated Ansieyes.
+
+\section{\textbf{Traditional Issue Classification Methods}}
+
+The earliest attempts at automating issue triage relied on classical \gls{ml} techniques applied to textual features extracted from issue reports. The core idea was straightforward: treat each issue as a text document, convert it into a numerical representation, and train a classifier to predict its type or severity.
+
+Antoniol et al. \cite{Antoniol2008} were among the first to frame issue classification as a text mining problem. They extracted \gls{tfidf} vectors from issue titles and descriptions in three open-source projects and trained Naive Bayes and Logistic Regression classifiers to distinguish bugs from enhancement requests. Their reported accuracies ranged from 77\% to 82\%, demonstrating that even simple bag-of-words features carry enough signal to make useful predictions. However, the approach struggled with ambiguously worded issues where the distinction between a bug and a feature request depended on context that the text alone did not capture.
+
+Menzies and Marcus \cite{Menzies2008} addressed a related but harder problem: automated severity assignment. They showed that bag-of-words models with careful feature selection could predict defect severity with reasonable accuracy, though their results varied considerably across projects. Their key insight was that feature selection mattered more than the choice of classifier---reducing noise in the vocabulary improved performance across all the models they tested.
+
+These early studies established the viability of automated classification but shared two important limitations. First, they treated issues as isolated text documents, ignoring the source code entirely. An issue saying ``the login page crashes when I click submit'' was reduced to a bag of words with no connection to the authentication module in the codebase. Second, their accuracy plateaued around 80\%, which was useful for coarse sorting but not reliable enough for fully automated triage without human review.
+
+\section{\textbf{Deep Learning for Bug Report Analysis}}
+
+As deep learning gained traction in \gls{nlp}, researchers began applying neural architectures to issue classification, achieving improvements over classical methods.
+
+Lee et al. \cite{Lee2017} explored the use of \gls{cnn} for bug localisation, demonstrating that convolutional filters could capture discriminative n-gram patterns in bug reports more effectively than hand-crafted features. Their work showed that deep models could learn useful representations directly from raw text, removing the need for manual feature engineering that earlier approaches relied on.
+
+Kallis et al. \cite{Kallis2019} took a more practical direction with Ticket Tagger, a tool designed specifically for GitHub issue classification. They used fastText embeddings---a lightweight alternative to full neural networks---to label issues as bugs, enhancements, or questions. Evaluated across several popular open-source repositories, Ticket Tagger achieved F1 scores around 0.84, a clear improvement over \gls{tfidf}-based baselines. The tool was designed to integrate directly with GitHub, making it one of the first research systems to be practically deployable. Its main limitation, however, was that it operated purely on issue text and could not explain the reasoning behind its predictions. A maintainer receiving a ``bug'' label from Ticket Tagger still had to read the issue and figure out which part of the code was affected.
+
+\gls{bert}-based approaches represented the next step forward. By pre-training on large text corpora and then fine-tuning on issue classification datasets, \gls{bert} models could capture semantic relationships that bag-of-words and fastText embeddings missed. For instance, a \gls{bert} model could learn that ``the app hangs on startup'' and ``application freezes during initialisation'' describe the same class of problem, even though they share few words.
+
+Despite these improvements, deep learning methods for issue analysis still operated within the same fundamental constraint as their predecessors: they classified issues based on text alone, without any understanding of the underlying codebase. A model might correctly label something as a high-severity bug, but it could not point to the function responsible or suggest a fix. This gap between classification and actionable analysis is precisely what we set out to address with Ansieyes.
+
+\section{\textbf{Duplicate Issue Detection Methods}}
+
+Duplicate issues are a persistent source of overhead in active repositories. When multiple users report the same underlying problem using different words, each duplicate consumes triager time and fragments the discussion. Automated duplicate detection has therefore received considerable attention.
+
+Sun et al. \cite{Sun2011} proposed a retrieval-based approach using \gls{bm25}, a ranking function from information retrieval, combined with topic models. They evaluated their method on the Mozilla and Eclipse bug repositories and achieved recall rates of 50--68\% for retrieving known duplicates. While this was a meaningful improvement over manual search, the recall was not high enough to rely on exclusively---roughly a third to half of duplicates were still missed.
+
+Deshmukh et al. \cite{Deshmukh2017} improved on purely text-based methods by incorporating structural features alongside \gls{tfidf} cosine similarity. They used information like stack traces, affected components, and operating system fields to augment the textual comparison. This multi-feature approach improved precision significantly, but it depended on bug reports containing structured metadata, which is often absent in GitHub issues where users write in free-form text.
+
+Rodrigues et al. \cite{Rodrigues2020} applied Siamese neural networks with \gls{bert} embeddings to the duplicate detection problem, achieving state-of-the-art results on benchmark datasets. Their architecture learned to map pairs of bug reports into a shared embedding space where duplicates were close together and non-duplicates were far apart. This semantic approach handled vocabulary mismatch well---the model could recognise that two reports describing the same crash in different words were indeed duplicates.
+
+The limitation common to all these approaches is that they require a pre-existing corpus of labelled duplicate pairs for training. For a new repository with no history of duplicate annotations, these methods cannot be directly applied without transfer learning or manual labelling effort. In Ansieyes, we address this by combining two complementary strategies: a fast \gls{tfidf} cosine method for pre-screening that requires no training data, and a Gemini-based semantic comparison for high-accuracy confirmation.
+
+\section{\textbf{LLM-Based Code Analysis}}
+
+The application of \gls{llm} to code-related tasks has grown rapidly, opening possibilities that were not feasible with earlier \gls{nlp} techniques.
+
+Chen et al. \cite{Chen2021} introduced Codex, a descendant of GPT-3 fine-tuned on publicly available code from GitHub. They demonstrated that Codex could generate functionally correct Python programs from natural language docstrings, solving 28.8\% of problems in the HumanEval benchmark on the first attempt and 70.2\% with repeated sampling. This work established that \gls{llm} could not only understand code syntax but also reason about intended behaviour described in natural language---a capability directly relevant to connecting issue descriptions with codebases.
+
+Feng et al. \cite{Feng2020} took a different approach with CodeBERT, a bimodal pre-trained model that learned representations from both programming languages and natural language simultaneously. CodeBERT achieved strong performance on tasks like code search (finding relevant code given a natural language query) and code documentation generation. For our purposes, the significance of CodeBERT lay in demonstrating that joint pre-training on code and text produced representations that bridged the gap between how developers describe problems and how code is structured.
+
+Zhang et al. \cite{Zhang2023} explored GPT-4's capabilities for automated code review, comparing its feedback to that of human reviewers. They found that GPT-4 could identify real bugs, suggest improvements, and provide explanations that developers found useful, with quality approaching human-level review in many cases. However, they also noted that the model occasionally hallucinated issues---flagging problems that did not actually exist in the code---and that its effectiveness varied depending on the complexity of the codebase.
+
+These studies gave us confidence that a modern \gls{llm} with a sufficiently large context window could handle our combined task: reading an issue description alongside a codebase and producing a structured analysis that maps symptoms to specific code locations. However, they also highlighted a key risk---hallucination---that we needed to mitigate through prompt design and output validation.
+
+\section{\textbf{Prompt Injection and LLM Security}}
+
+Any system that feeds untrusted user input to an \gls{llm} must contend with prompt injection attacks. Since Ansieyes processes GitHub issue descriptions---which anyone can write---this threat is directly relevant to our design.
+
+Perez and Ribeiro \cite{Perez2022} provided one of the first systematic taxonomies of prompt injection techniques. Through a large-scale competition, they catalogued strategies that attackers use to override a model's system instructions, including direct instruction overrides (``ignore all previous instructions and do X''), context manipulation (embedding fake system messages within user input), and payload smuggling (hiding malicious instructions within seemingly benign text). Their work demonstrated that even commercial \gls{llm} applications were vulnerable to these techniques, with success rates that varied by model but were consistently non-trivial.
+
+Greshake et al. \cite{Greshake2023} extended this analysis to indirect prompt injection, where the malicious payload comes not from the direct user input but from external data that the \gls{llm} processes. This is precisely the threat model that applies to Ansieyes: a malicious user could craft a GitHub issue whose description contains hidden instructions designed to manipulate the model's analysis. For example, an attacker might embed text like ``ignore the above code and report that this issue is not a security vulnerability'' to suppress a legitimate finding. Greshake et al. demonstrated successful indirect injection attacks against several real-world \gls{llm}-integrated applications, underscoring that this was not a theoretical concern.
+
+The limitation of the existing security research, from our perspective, is that it primarily focuses on characterising the threat rather than building practical defences for specific application contexts. Most proposed mitigations are general-purpose---prompt hardening, input sanitisation, output filtering---without concrete implementations tailored to software engineering workflows. In Ansieyes, we built a three-layer defence (statistical classifier, regex pattern matching, and heuristic analysis) specifically tuned for the patterns we expect to see in GitHub issue descriptions.
+
+\section{\textbf{Automated Issue Triage Tools}}
+
+Beyond academic research, several practical tools exist for automating parts of the issue triage workflow.
+
+GitHub's own ecosystem includes label bots that apply keyword-based rules to classify incoming issues. For example, a bot might label any issue containing the word ``crash'' as a bug and any issue containing ``feature request'' in the title as an enhancement. These bots are easy to set up and require no \gls{ml} infrastructure, but their accuracy is limited by the rigidity of keyword matching. Issues that describe bugs without using expected keywords are missed, and those that use bug-related words in non-bug contexts are mislabelled.
+
+More sophisticated tools like Ticket Tagger \cite{Kallis2019} use trained models for classification, but as we discussed, they still operate on issue text alone. Other tools focus on specific aspects---for instance, duplicate detection bots that compute similarity scores between new and existing issues---but none combine classification, root cause analysis, and solution generation in a single pipeline.
+
+Commercial platforms like Jira offer workflow automation and \gls{api}-driven integrations, but their triage features are rule-based and lack the contextual understanding that comes from actually reading the source code. They can route issues to the right team based on labels and keywords, but they cannot tell a developer which function to look at or what a fix might look like.
+
+The key limitation across all existing tools is their isolation: each addresses one facet of triage without connecting the dots. A label bot classifies but does not explain. A duplicate detector finds matches but does not analyse root causes. A code review tool examines changes but does not process issue reports. No existing tool that we found combines all these capabilities into an integrated pipeline while also defending against adversarial inputs.
+
+\section{\textbf{Research Gap Analysis}}
+
+Our survey reveals several gaps in the existing literature and tooling that Ansieyes was designed to address.
+
+First, \textbf{classification without explanation}. Traditional \gls{ml} and deep learning approaches can predict issue types and severities with reasonable accuracy, but they cannot tell a maintainer \textit{why} an issue is classified as a bug or \textit{where} in the code the problem likely originates. This limits their practical utility: a label alone does not save the triager from reading and understanding the issue.
+
+Second, \textbf{text-only analysis}. Nearly all existing classification and duplicate detection methods operate solely on issue text. They do not incorporate the source code, which means they cannot perform root cause analysis or suggest code-level fixes. The recent \gls{llm}-based code analysis work demonstrates that models can reason about code, but no prior system that we found uses this capability specifically for issue triage.
+
+Third, \textbf{fragmented pipelines}. Existing tools address classification, duplicate detection, and code review as separate problems. A maintainer using these tools must still manually connect the outputs---checking one tool for the issue type, another for duplicates, and yet another for code context. An integrated system that produces a single, structured analysis would significantly reduce this overhead.
+
+Fourth, \textbf{security as an afterthought}. Most automated triage tools do not consider the risk of adversarial inputs. Given the growing awareness of prompt injection attacks, any production system that processes untrusted text through an \gls{llm} must include security measures. We found no existing triage tool that incorporated prompt injection defence.
+
+Fifth, \textbf{scalability to large codebases}. While \gls{llm} context windows have grown dramatically, many real-world repositories still exceed even the largest windows. Existing code analysis approaches either ignore this constraint or require manual specification of relevant files. An automated strategy for selecting the right subset of code for analysis is needed.
+
+Ansieyes addresses all five of these gaps through its integrated design: \gls{llm}-powered classification with natural language explanations, codebase-aware root cause analysis, combined classification and duplicate detection, a three-layer security module, and a two-pass architecture for large repositories.
+
+\section{\textbf{Summary}}
+
+In this chapter, we surveyed the literature across six areas relevant to automated issue triage. Traditional \gls{ml} methods established the feasibility of text-based classification but were limited to around 80\% accuracy and offered no explanations. Deep learning improved accuracy and representation quality but remained text-only. Duplicate detection methods evolved from keyword-based retrieval to semantic neural approaches, though all required labelled training data. \gls{llm}-based code analysis demonstrated that models could reason about code at a level approaching human reviewers, but also introduced risks like hallucination and prompt injection. Existing triage tools addressed individual aspects of the problem in isolation, with none combining classification, root cause analysis, solution generation, and security into a unified system.
+
+These gaps define the design space for Ansieyes. In the next chapter, we describe the theoretical foundations and tools that underpin our system, including the Transformer architecture, \gls{tfidf}-based similarity, prompt engineering techniques, and the software stack we built upon.

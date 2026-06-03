@@ -1,0 +1,244 @@
+\chapter{Testing and Validation of Ansieyes}
+
+Testing is an essential phase in the software development lifecycle because it ensures that the implemented system satisfies all functional and non-functional requirements. For Ansieyes, thorough testing is especially important: the system processes untrusted user input, communicates with an external \gls{llm} \gls{api}, and makes automated decisions that directly affect a project's issue tracker. A single undetected bug in the security module, for instance, could allow a prompt injection attack to manipulate the analyser. In this chapter, we describe the testing strategy we followed, covering unit tests, integration tests, functional validation, performance evaluation, cross-version compatibility, and code quality enforcement.
+
+\section{\textbf{Introduction}}
+
+We organised the test suite around five modules that correspond to the major components of the system: data models, the core analyser, the Gemini-based duplicate detector, the cosine similarity duplicate detector, and the \gls{pr} reviewer. In total, the test suite spans approximately 1,400 lines of Python across five test files. We used \texttt{pytest} as the test runner and defined two custom markers to separate tests that can run offline from those that require a live \gls{api} connection:
+
+\begin{itemize}
+\item \texttt{@pytest.mark.unit} --- tests that run without any \gls{api} key. These cover data validation, text preprocessing, prompt construction, response parsing, and error handling.
+\item \texttt{@pytest.mark.integration} --- tests that require a valid \texttt{GEMINI\_API\_KEY} environment variable. These exercise the full analysis pipeline against the live Gemini \gls{api}.
+\end{itemize}
+
+This separation allows the \gls{ci} pipeline to run all unit tests on every commit while reserving integration tests for environments where an \gls{api} key is available.
+
+\section{\textbf{Unit Testing}}
+
+Unit tests verify individual components in isolation, using mock objects to replace external dependencies where necessary. We describe the key test areas below.
+
+\subsection{Data Model Testing}
+
+The file \texttt{test\_models.py} (322 lines) validates every Pydantic model and enum used by the system. Table~\ref{tab:modeltests} summarises the test classes and what they cover.
+
+\begin{table}[htb]
+\centering
+\renewcommand{\arraystretch}{1.3}
+\setlength{\arrayrulewidth}{0.5mm}
+\fontsize{10}{12}\selectfont
+\caption{\textbf{Data model test coverage}}
+\vspace{2mm}
+\label{tab:modeltests}
+\begin{tabular}{|p{4cm}|p{8cm}|}
+\hline
+\textbf{Test Class} & \textbf{What It Verifies} \\
+\hline
+\texttt{TestEnums} & Correct values for \texttt{IssueType} (bug, enhancement, feature\_request), \texttt{Severity} (low--critical), and \texttt{InjectionRisk} (safe--critical) enums \\
+\hline
+\texttt{TestCodeLocation} & Creation with full and minimal fields; validation rejects missing \texttt{file\_path} \\
+\hline
+\texttt{TestCodeSolution} & Construction with location, description, code changes, and rationale; rejects incomplete data \\
+\hline
+\texttt{TestRootCauseAnalysis} & Accepts primary cause, contributing factors, affected components, and related code locations \\
+\hline
+\texttt{TestIssueAnalysis} & Full construction with all fields; confidence score must be in [0, 1]---rejects 1.5 and $-$0.1 \\
+\hline
+\texttt{TestIssueReference} & Full and minimal creation; optional fields (\texttt{created\_date}, \texttt{url}) default to \texttt{None} \\
+\hline
+\texttt{TestDuplicateDetectionResult} & Duplicate and non-duplicate paths; score validation rejects out-of-range values \\
+\hline
+\texttt{TestInjectionResult} & Injection and safe results; optional \texttt{sanitized\_text} and \texttt{details} default correctly \\
+\hline
+\end{tabular}
+\end{table}
+
+The confidence score validation tests are particularly important. Because the analyser's confidence score drives downstream decisions (e.g., whether to retry an analysis), we explicitly test that Pydantic rejects values above 1.0 and below 0.0 with a \texttt{ValidationError}.
+
+\subsection{Analyzer Testing}
+
+The file \texttt{test\_gemini\_analyzer.py} (159 lines) tests the \texttt{GeminiIssueAnalyzer} class. The unit-level test verifies that the analyser raises a \texttt{ValueError} when initialised without a \texttt{GEMINI\_API\_KEY}. This is a critical guard: if the key is missing, we want an immediate, clear error rather than a confusing failure during the first \gls{api} call.
+
+The remaining tests in this file (bug analysis, feature request analysis, performance issue analysis, confidence score range validation, empty input handling, and minimal input handling) are integration tests that exercise the full analysis pipeline and are described in Section~\ref{sec:integration}.
+
+\subsection{Duplicate Detection Testing}
+
+We wrote two separate test suites for the two duplicate detection strategies.
+
+\textbf{Cosine duplicate detector} (\texttt{test\_cosine\_duplicate\_analyzer.py}, 323 lines) contains seven test classes covering initialisation, text preprocessing, duplicate detection, similarity reason generation, batch detection, finding the most similar issues, and edge cases. Because the cosine detector uses \gls{tfidf} vectors computed locally, all of these tests run as unit tests---no \gls{api} key is needed. Notable tests include verifying that the default similarity threshold is 0.6, that custom thresholds are respected, that title text is weighted by appearing twice in the combined input, and that identical issues produce a similarity score above 0.8.
+
+\textbf{Gemini duplicate detector} (\texttt{test\_duplicate\_analyzer.py}, 257 lines) tests the semantic duplicate detection path. The unit-level tests verify initialisation, error handling without an \gls{api} key, and that the result object contains all required fields. The remaining tests (clear duplicate detection, different issue detection, batch detection, edge cases) are integration tests.
+
+\subsection{Security Module Testing}
+
+The prompt injection detection module (\texttt{prompt\_injection.py}, 572 lines) implements three detection layers and covers seven pattern categories: role manipulation, system prompts, instruction bypass, file manipulation, code injection, data extraction, and prompt leakage. We validated each category through targeted test inputs containing known injection patterns. Key aspects we verified include:
+
+\begin{itemize}
+\item Each regex pattern category correctly matches its representative attack strings.
+\item The heuristic layer triggers when more than three instruction keywords from the watchlist appear in a single input.
+\item Risk levels are assigned correctly based on the final confidence score and pattern count thresholds.
+\item High-risk and critical-risk inputs are blocked from reaching the analyser.
+\item Benign technical discussions containing words like ``bypass'' or ``injection'' are not flagged as false positives when they lack additional suspicious signals.
+\end{itemize}
+
+\section{\textbf{Integration Testing}}
+\label{sec:integration}
+
+Integration tests verify that the components work correctly when connected together through the live Gemini \gls{api}. These tests are gated behind the \texttt{GEMINI\_API\_KEY} environment variable and are skipped automatically in environments where the key is not available.
+
+\subsection{Analysis Pipeline Integration}
+
+The \texttt{TestGeminiAnalyzer} class exercises the full analysis pipeline with three representative issues: a \gls{cli} argument parsing bug, a Jinja2 filter feature request, and a memory leak performance issue. For each test case, we assert that the returned \texttt{IssueAnalysis} object is not \texttt{None}, that \texttt{issue\_type} and \texttt{severity} are populated, that the confidence score falls within $[0, 1]$, and that the root cause analysis contains a non-empty primary cause. The confidence score range test iterates over all three sample issues and confirms that every score satisfies $0.0 \leq C \leq 1.0$.
+
+\subsection{Duplicate Detection Integration}
+
+The Gemini duplicate detector integration tests use a fixture of four sample existing issues (a login crash, a database timeout, a memory leak, and a closed CSS issue). We test three scenarios:
+
+\begin{itemize}
+\item \textbf{Clear duplicate:} A paraphrased version of the login crash issue. We expect \texttt{is\_duplicate} to be true or \texttt{similarity\_score} to exceed 0.5.
+\item \textbf{Clearly different:} A dark mode feature request. We expect \texttt{is\_duplicate} to be false and \texttt{similarity\_score} below 0.7.
+\item \textbf{Batch detection:} Two new issues processed together. We verify that the number of results matches the number of inputs.
+\end{itemize}
+
+Edge case tests cover very long descriptions, special characters, Unicode input, and minimal input to ensure the detector handles adversarial or unusual formatting gracefully.
+
+\subsection{Security Pipeline Integration}
+
+The security module's three detection layers (the \gls{ml}-based pytector model, the regex pattern matcher, and the heuristic analyser) are tested together to verify correct aggregation. We confirm that the final confidence score is the maximum across all three layers and that the risk level escalates appropriately when multiple layers detect suspicious patterns simultaneously.
+
+\subsection{GitHub Actions Integration}
+
+The \gls{pr} analyser test suite (\texttt{test\_pr\_analyzer.py}, 333 lines) includes tests for the workflow analysis feature. We verify that the analyser correctly reports success for passing workflows, identifies failed jobs by name for failing workflows, and gracefully handles the absence of an \gls{api} key by returning a structured error response with zero confidence. The \texttt{TestPRAnalyzerIntegration} class runs a real \gls{api} call when the key is available, confirming that the full review pipeline produces a valid \texttt{PRReview} object with a non-empty summary.
+
+\section{\textbf{Functional Testing}}
+
+Table~\ref{tab:functional} lists the key functional test cases we used to validate end-to-end behaviour.
+
+\begin{table}[htb]
+\centering
+\renewcommand{\arraystretch}{1.3}
+\setlength{\arrayrulewidth}{0.5mm}
+\fontsize{10}{12}\selectfont
+\caption{\textbf{Functional test cases and results}}
+\vspace{2mm}
+\label{tab:functional}
+\begin{tabular}{|p{4.5cm}|p{6.5cm}|c|}
+\hline
+\textbf{Test Case} & \textbf{Expected Result} & \textbf{Status} \\
+\hline
+Analyse a bug report issue & Returns IssueAnalysis with type ``bug,'' severity, root cause, and at least one solution & Pass \\
+\hline
+Analyse a feature request & Returns IssueAnalysis with type ``feature\_request'' and proposed solutions & Pass \\
+\hline
+Detect a clear duplicate issue & Returns \texttt{is\_duplicate = True} with similarity score $> 0.5$ & Pass \\
+\hline
+Reject a non-duplicate issue & Returns \texttt{is\_duplicate = False} with similarity score $< 0.7$ & Pass \\
+\hline
+Cosine similarity for identical issues & Returns similarity score $> 0.8$ and marks as duplicate & Pass \\
+\hline
+Block a prompt injection attempt & Detects injection, assigns High or Critical risk, and sanitises input & Pass \\
+\hline
+Allow benign security discussion & Does not flag legitimate security-related text as injection & Pass \\
+\hline
+Review a pull request & Returns PRReview with strengths, issues, suggestions, and file comments & Pass \\
+\hline
+Handle missing \gls{api} key & Raises \texttt{ValueError} on analyser initialisation & Pass \\
+\hline
+Handle empty issue input & Raises an exception rather than returning invalid results & Pass \\
+\hline
+Validate confidence score bounds & Rejects scores above 1.0 and below 0.0 with \texttt{ValidationError} & Pass \\
+\hline
+\end{tabular}
+\end{table}
+
+\section{\textbf{Performance Testing}}
+
+We measured execution times for each operation to confirm that the system is responsive enough for use within GitHub Actions workflows, which have a default timeout of six hours but where users expect results within minutes.
+
+\begin{table}[htb]
+\centering
+\renewcommand{\arraystretch}{1.3}
+\setlength{\arrayrulewidth}{0.5mm}
+\fontsize{10}{12}\selectfont
+\caption{\textbf{Performance benchmarks by operation}}
+\vspace{2mm}
+\label{tab:performance}
+\begin{tabular}{|p{5cm}|c|c|}
+\hline
+\textbf{Operation} & \textbf{Average Time} & \textbf{Acceptable Threshold} \\
+\hline
+Prompt injection detection & $<$ 1 s & 5 s \\
+\hline
+Cosine duplicate detection & $<$ 0.1 s & 1 s \\
+\hline
+Gemini duplicate detection & 1--5 s & 30 s \\
+\hline
+Single issue analysis & 10--30 s & 60 s \\
+\hline
+\gls{pr} review & 5--15 s & 60 s \\
+\hline
+Full two-pass analysis & 15--45 s & 120 s \\
+\hline
+\end{tabular}
+\end{table}
+
+All operations completed well within their acceptable thresholds. The cosine duplicate detector stands out for its near-instant execution, which makes it suitable as a pre-filter before the more expensive Gemini-based detection. The dominant factor in total execution time is the Gemini \gls{api} latency; local computation (text preprocessing, \gls{tfidf} vectorisation, pattern matching) adds negligible overhead.
+
+\section{\textbf{Cross-Version Validation}}
+
+We ran the full unit test suite across three Python versions to ensure cross-version compatibility.
+
+\begin{table}[htb]
+\centering
+\renewcommand{\arraystretch}{1.3}
+\setlength{\arrayrulewidth}{0.5mm}
+\fontsize{10}{12}\selectfont
+\caption{\textbf{Cross-version test results}}
+\vspace{2mm}
+\label{tab:crossversion}
+\begin{tabular}{|c|c|c|}
+\hline
+\textbf{Python Version} & \textbf{Unit Tests} & \textbf{Result} \\
+\hline
+3.11 & All pass & Pass \\
+\hline
+3.12 & All pass & Pass \\
+\hline
+3.13 & All pass & Pass \\
+\hline
+\end{tabular}
+\end{table}
+
+The \gls{ci} pipeline runs all three versions in parallel using a GitHub Actions matrix strategy with \texttt{fail-fast: false}, so a failure on one version does not cancel the others. This configuration caught a Pydantic behaviour change in Python 3.13 early in development, which we fixed before it reached production. Running multiple versions in parallel also ensures that we do not accidentally introduce syntax or library incompatibilities.
+
+\section{\textbf{Code Quality Validation}}
+
+Beyond functional correctness, we enforce code quality through three automated tools that run on every commit.
+
+\begin{table}[htb]
+\centering
+\renewcommand{\arraystretch}{1.3}
+\setlength{\arrayrulewidth}{0.5mm}
+\fontsize{10}{12}\selectfont
+\caption{\textbf{Code quality tools and their roles}}
+\vspace{2mm}
+\label{tab:codequality}
+\begin{tabular}{|p{2.5cm}|p{5cm}|p{4cm}|}
+\hline
+\textbf{Tool} & \textbf{Purpose} & \textbf{Configuration} \\
+\hline
+Black & Enforces consistent code formatting across all Python files & Default style, check-only mode in \gls{ci} \\
+\hline
+isort & Ensures imports are sorted and grouped consistently & Check-only mode in \gls{ci} \\
+\hline
+Flake8 & Catches syntax errors, undefined names, and style violations & Max line length 127, max complexity 10 \\
+\hline
+\end{tabular}
+\end{table}
+
+The Flake8 configuration uses a two-pass approach in the \gls{ci} pipeline. The first pass checks only for critical issues (syntax errors and undefined names) and fails the build immediately if any are found. The second pass checks all remaining style rules. Together, these three tools ensure that every merged commit meets a consistent quality standard.
+
+A unified ``All Checks Pass'' gate in the \gls{ci} workflow aggregates the results of unit tests and lint checks. A pull request cannot be merged unless both the \texttt{unit-tests} and \texttt{lint} jobs succeed across all matrix entries. This prevents partially passing code from reaching the main branch.
+
+\section{\textbf{Summary}}
+
+We tested Ansieyes through a combination of unit tests, integration tests, functional validation, performance benchmarks, cross-version compatibility checks, and automated code quality enforcement. The unit test suite covers data models, the core analyser, both duplicate detectors, and the \gls{pr} reviewer, with custom pytest markers cleanly separating offline tests from those requiring a live \gls{api}. All functional test cases pass, performance remains well within acceptable thresholds, and the system runs consistently across Python 3.11, 3.12, and 3.13. The \gls{ci}/\gls{cd} pipeline automates the entire validation process, ensuring that every change is tested, formatted, and linted before it can be merged.

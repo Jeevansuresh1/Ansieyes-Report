@@ -1,0 +1,12 @@
+\addcontentsline{toc}{chapter}{Abstract}\vspace{-1cm}
+%Border
+\begin{tikzpicture}[remember picture, overlay]
+  \draw[line width = 4pt] ($(current page.north west) + (0.75in,-0.75in)$) rectangle ($(current page.south east) + (-0.75in,0.75in)$);
+\end{tikzpicture}
+Open-source software projects hosted on GitHub often receive a large volume of issues, including bug reports, feature requests, and enhancement proposals. Triaging these issues manually takes a significant amount of developer time, and the quality of triage depends heavily on who is doing it and how familiar they are with the codebase. Existing automation tools typically rely on keyword matching or simple rules, which fail to capture the actual meaning behind an issue or relate it to the source code. These limitations motivated us to explore whether a \gls{llm} could be used to perform deeper, context-aware issue analysis at scale.
+
+We developed Ansieyes, a system that uses Google's Gemini 2.0 Flash model to automatically analyse GitHub issues with full awareness of the repository's source code. The system classifies each issue by type and severity, traces the likely root cause to specific files and functions, and suggests concrete fixes. It also detects duplicate issues through both \gls{ai}-powered semantic comparison and a faster offline method based on \gls{tfidf} cosine similarity. A multi-layered security module protects the pipeline against prompt injection attacks by combining \gls{ml}-based detection, pattern matching across seven attack categories, and heuristic analysis. To handle large codebases that exceed the model's context window, we designed a two-pass architecture where a Librarian module first narrows down the relevant files before a Surgeon module performs the deep analysis. The system plugs directly into GitHub Actions for end-to-end automation and also offers a \gls{cli} for local use.
+
+During testing, the system classified issues with roughly 91\% accuracy and produced analyses with confidence scores above 0.7 in about 85\% of cases. The Gemini-based duplicate detector achieved an F1 score of 0.87, while the lightweight cosine approach reached 0.74 with near-instant response times. The prompt injection detector caught 96\% of adversarial inputs across all tested categories. On medium to large repositories, the two-pass architecture cut token usage by 57--70\%, making it feasible to analyse codebases that the single-pass approach could not handle at all.
+
+\pagebreak

@@ -1,0 +1,96 @@
+\chapter{Introduction to Ansieyes}
+Software teams working on open-source projects face a growing challenge: the sheer number of issues that users and contributors file every day. A popular repository on GitHub can easily accumulate dozens of new issues in a single week, each one requiring someone to read it, figure out whether it describes a bug or a feature request, gauge how urgent it is, and ideally point to the part of the codebase that needs attention. Doing all of this by hand does not scale. In this chapter, we lay out the background behind Ansieyes and define the objectives that guided our work.
+
+\section[Introduction]{\textbf{Introduction}}
+Issue trackers are one of the most important coordination tools in software development. GitHub alone hosts over 100 million repositories, and the most active among them receive hundreds of issues per month. When an issue arrives, a maintainer typically reads its title and description, decides whether it is a bug, an enhancement, or a feature request, assigns a severity label, and routes it to the right person. In small teams this works well enough, but once a project grows beyond a handful of contributors the bottleneck becomes obvious.
+
+Several factors make manual triage particularly hard. First, the person doing it needs to be familiar with the codebase---knowing which module handles authentication, which file parses configuration, and so on. Second, many issues are vaguely written, requiring the triager to mentally connect a user-reported symptom to an actual code path. Third, duplicates are surprisingly common; users often report the same underlying bug using very different words, and spotting the overlap requires remembering or searching through older issues.
+
+Over the past two years, \gls{llm} have shown strong abilities in both natural language understanding and code comprehension. Models like Google's Gemini can accept over a million tokens of context, which means they can read an entire mid-sized codebase in a single prompt. This opens up a practical possibility: instead of asking a human to bridge the gap between an issue description and the source code, we can feed both to an \gls{llm} and ask it to produce a structured analysis.
+
+Ansieyes is our attempt to turn this idea into a working system. It takes a GitHub issue and the repository's source code as input, runs them through Gemini 2.0 Flash, and produces a structured output that includes the issue type, severity, a root cause analysis pointing to specific files and functions, and one or more proposed fixes. We also built layers around this core---duplicate detection, prompt injection defence, and a two-pass architecture for large codebases---to make the tool practical for real-world use.
+
+\section[Motivation]{\textbf{Motivation}}
+
+We started this project after noticing how much time open-source maintainers spend on repetitive triage work. In our own experience contributing to repositories, we saw issues sit unclassified for days simply because no one with enough context was available to look at them. At the same time, we observed that Gemini and similar models had become good enough at understanding code to make automated analysis feasible---something that was not practical even two years ago.
+
+The specific gap we wanted to fill was the connection between an issue description and the codebase. Existing label bots can tell you that something is probably a bug based on keywords like ``crash'' or ``error,'' but they cannot tell you \textit{which function} is likely at fault or \textit{what a fix might look like}. We believed that feeding the full source code to a model with a large context window could bridge this gap.
+
+\section[Problem statement]{\textbf{Problem statement}}
+
+Manually triaging issues in active software repositories is slow, inconsistent, and does not scale. Current automation tools offer shallow classification without codebase context, cannot trace root causes, and are vulnerable to adversarial inputs when backed by \gls{llm}. There is a need for an integrated system that can classify, analyse, and propose fixes for issues while remaining secure and scalable.
+
+\section[Objectives]{\textbf{Objectives}}
+The objectives of this project are:
+\begin{enumerate}
+\item To build an issue analysis system that uses Google's Gemini \gls{llm} to classify issues, identify root causes in the source code, and propose concrete solutions.
+\item To develop a security module that detects and mitigates prompt injection attacks before they reach the analysis engine.
+\item To design a two-pass analysis architecture (Librarian--Surgeon) that scales the system to large repositories by selecting only the relevant source files for deep analysis.
+\end{enumerate}
+
+\section[Brief Methodology of the project]{\textbf{Brief Methodology of the project}}
+We followed an iterative development approach, building and testing each module independently before integrating them into the full pipeline. The broad sequence of work was:
+
+\begin{enumerate}
+\item We started by studying existing triage workflows and identifying the key outputs a useful analysis should contain (type, severity, root cause, solutions).
+\item We built the core analysis engine first, iterating on prompt design until the Gemini responses consistently met our quality thresholds.
+\item We then added the security layer, testing it against a corpus of known injection patterns.
+\item The duplicate detection module came next, with two parallel implementations: one using Gemini for semantic comparison and another using \gls{tfidf} cosine similarity for speed.
+\item We designed and implemented the Librarian--Surgeon two-pass architecture to handle codebases too large for a single prompt.
+\item Finally, we packaged everything with GitHub Actions workflows, \gls{cli} tools, and a test suite running across three Python versions.
+\end{enumerate}
+
+Figure \ref{fig:methodology} provides an overview of this workflow.
+
+\begin{figure}[htb]
+\centering
+\begin{tikzpicture}[
+    node distance=0.7cm,
+    block/.style={rectangle, draw, fill=blue!8, text width=4.8cm, minimum height=0.9cm, align=center, rounded corners=2pt, font=\small},
+    arrow/.style={-{Stealth[length=2.5mm]}, thick}
+]
+\node[block] (req) {Requirement Analysis};
+\node[block, below=of req] (core) {Core Analysis Engine};
+\node[block, below=of core] (sec) {Security Layer};
+\node[block, below=of sec] (dup) {Duplicate Detection};
+\node[block, below=of dup] (twopass) {Two-Pass Architecture};
+\node[block, below=of twopass] (integ) {Integration and Testing};
+
+\draw[arrow] (req) -- (core);
+\draw[arrow] (core) -- (sec);
+\draw[arrow] (sec) -- (dup);
+\draw[arrow] (dup) -- (twopass);
+\draw[arrow] (twopass) -- (integ);
+\end{tikzpicture}
+\caption{Development workflow for Ansieyes}
+\label{fig:methodology}
+\end{figure}
+
+\section[Assumptions made / Constraints of the project]{\textbf{Assumptions made / Constraints of the project}}
+
+Our work operates under a few assumptions and practical constraints:
+\begin{enumerate}
+\item A valid Google Gemini \gls{api} key with adequate quota is required for analysis. Without it, only the offline cosine duplicate detector works.
+\item The repository's source code must fit within Gemini's context window (about 1 million tokens). For larger repositories, the two-pass architecture reduces the effective context, but exceptionally large monorepos may still be partially covered.
+\item We assume issues are written in English. Multi-lingual support is outside our current scope.
+\item Only text-based source files are analysed; binary assets, images, and compiled outputs are excluded.
+\item The accuracy of root cause mapping depends on how complete the codebase snapshot is---if key files are excluded from the Repomix output, the model may miss them.
+\end{enumerate}
+
+\section[Organization of the report]{\textbf{Organization of the report}}
+
+The rest of this report is organised as follows:
+\begin{itemize}
+\item Chapter 2, Literature Survey, reviews existing work on issue classification, duplicate detection, LLM-based code analysis, and LLM security.
+\item Chapter 3, Theoretical Background, covers \gls{llm}, text similarity methods, prompt engineering, and the tools we used.
+\item Chapter 4, Software Requirements Specification, defines the functional and non-functional requirements, hardware and software needs.
+\item Chapter 5, System Design, describes the architecture, data models, and the two-pass analysis strategy.
+\item Chapter 6, Implementation, walks through the key algorithms and integration points.
+\item Chapter 7, Testing and Validation, presents the testing procedures including unit, integration, and functional testing.
+\item Chapter 8, Results and Discussion, presents our experimental results across classification, duplicate detection, security, and token efficiency.
+\item Chapter 9, Conclusion and Future Scope, summarises conclusions and outlines directions for future work.
+\end{itemize}
+
+\section{Summary}
+
+This chapter introduced the problem of manual issue triage in open-source software projects, motivated the need for an automated, codebase-aware system, and defined the objectives and methodology behind Ansieyes. In the next chapter, we survey the existing literature on issue classification, duplicate detection, LLM-based code analysis, and LLM security to identify the research gaps that Ansieyes addresses.

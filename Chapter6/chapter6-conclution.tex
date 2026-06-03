@@ -1,0 +1,42 @@
+\chapter{Conclusion and Future Scope}
+
+This chapter draws together the main findings from our work, acknowledges the current limitations, and outlines the directions we see for extending the system.
+
+\section{Conclusion}
+
+We set out to build a system that could take over the repetitive parts of GitHub issue triage---classifying issues, tracing root causes to specific code locations, and proposing fixes---while remaining secure and scalable. Ansieyes achieves this through a combination of \gls{llm}-powered analysis, multi-layered security, and a two-pass architecture for large codebases.
+
+The core analyser, powered by Gemini 2.0 Flash, classifies issues with about 91\% accuracy and produces root cause analyses that correctly point to the relevant source files in 85\% of cases. The quality validation and retry mechanism ensures that virtually every issue receives at least one actionable solution proposal. Duplicate detection works at two speeds: the Gemini-based approach catches semantic duplicates with an F1 of 0.87, while the cosine similarity fallback runs near-instantly for rapid pre-screening.
+
+On the security front, the three-layer detection pipeline catches 96\% of prompt injection attempts across seven attack categories. The conservative aggregation strategy---taking the maximum risk from any detector---means the system errs on the side of caution, which we consider the right trade-off for an automated pipeline processing untrusted input.
+
+The Librarian--Surgeon architecture proved essential for practical deployment. On repositories with 5,000 to 100,000 lines of code, it reduced token consumption by 57--70\%, and for larger codebases it enabled analysis that the single-pass approach simply could not handle.
+
+\section{Future Scope}
+
+Several extensions would strengthen the system:
+
+\begin{enumerate}
+\item \textbf{Multi-model support.} Adding backends for GPT-4, Claude, and open-source models (Llama, Mistral) would let teams choose based on cost, privacy, or performance needs.
+
+\item \textbf{Multi-lingual issues.} Many open-source projects have contributors who file issues in languages other than English. Gemini already supports multiple languages, so adapting the prompts and evaluation pipeline would be the main work.
+
+\item \textbf{Feedback-driven improvement.} When a developer edits or overrides an analysis, that feedback could be collected and used to refine prompt templates over time, creating a lightweight learning loop without full model fine-tuning.
+
+\item \textbf{Platform integration.} Extending support to GitLab, Jira, and Azure DevOps would broaden the system's applicability beyond GitHub.
+
+\item \textbf{Automated fix generation.} The current system proposes solutions in text form. A natural next step is generating actual pull requests with the proposed code changes, subject to human review before merging.
+
+\item \textbf{Adversarial robustness.} The prompt injection detector could benefit from periodic red-teaming exercises and the addition of adversarial training data to keep pace with evolving attack techniques.
+\end{enumerate}
+
+\section{Learning Outcomes of the Project}
+\begin{itemize}
+\item Gained hands-on experience with \gls{llm} integration, including prompt design, structured output parsing, and handling model limitations like hallucination.
+\item Built a multi-layered security system from scratch, understanding how \gls{ml}-based detection, pattern matching, and heuristics complement each other.
+\item Developed proficiency with Pydantic for runtime type checking, pytest for structured testing, and GitHub Actions for \gls{ci}/\gls{cd} automation.
+\item Learned to design for scalability constraints, particularly the token limits of \gls{llm} context windows, through the Librarian--Surgeon two-pass approach.
+\item Worked with \gls{nlp} techniques (\gls{tfidf} vectorisation, cosine similarity) and understood their trade-offs against \gls{llm}-based alternatives.
+\item Gained experience packaging Python tools for distribution, including \gls{cli} design and configuration management.
+\item Understood the practical realities of deploying \gls{ai} systems: \gls{api} cost management, error handling, retry strategies, and the importance of validating model outputs before acting on them.
+\end{itemize}

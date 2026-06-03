@@ -1,0 +1,174 @@
+\documentclass[12pt,oneside,a4paper]{book}
+
+\input{./AuxFiles/Packages}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Document settings
+\title{Ansieyes: Smart AI-Based Issue Triage for GitHub}
+\subCode{CS800P}
+\Department[CSE]{Computer Science and Engineering}
+\academicYear{2025-26}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Report Type:
+%%%%%%%%%%%%%%%%%% For Plagiarism Check %%%%%%%%%%%%%%%%%%%%%%%
+%\EnPlagReport
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Student Details%%%
+\stuNameA{Jeevan S}
+\stuUSNA{1RV22CS075}
+\stuNameB{Mohammed Adnan}
+\stuUSNB{1RV23CS409}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Guide Related commands
+%% Internal Guide %%
+\guideNameA{Prof. Savitri Kulkarni}
+\guideDesignationA{Assistant Professor}
+\guideDeptA[CSE]{Computer Science and Engineering}
+\guideOrgA{RV College of Engineering}
+
+%% External Guide
+\guideNameB{Mr. Shashank Venkat}
+\guideDesignationB{Software Engineer}
+\guideDeptB{Ansible}
+\guideOrgB{Red Hat}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Esteem members related commands
+%% Panel Members %%
+\panelMemberNameA{[Panel Member A]}
+\panelMemberDesigA{[Designation]}
+\panelMemberDeptA[CSE]{Computer Science and Engineering}
+\panelMemberNameB{[Panel Member B]}
+\panelMemberDesigB{[Designation]}
+\panelMemberDeptB[CSE]{Computer Science and Engineering}
+
+%% Project co-ordinators
+\projectCoOrdNameA{Prof. Savitri Kulkarni}
+\projectCoOrdDesigA{Assistant Professor}
+\projectCoOrdDeptA[CSE]{Computer Science and Engineering}
+\projectCoOrdNameB{[Project Coordinator B]}
+\projectCoOrdDesigB{[Designation]}
+\projectCoOrdDeptB[CSE]{Computer Science and Engineering}
+
+%%%%%%%%%%%%%%%%% Esteemed Members %%%%%%%%%%%%%%%%%%
+\HOD{Dr. Shantarangaswamy}
+\Principal{Dr. K.N. Subramanya}
+\DeanAcademics{Dr. M.V. Renukadevi}
+\VicePrincipal{Dr. K.S. Geetha}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%  QRL %%%%%%%%%%%%%%%%%%%%%%%%%%
+\QRurl{https://drive.google.com/drive/folders/1e8czYiHEDWx7P6BHS2Y1OSR7qXXmXcyH}
+
+%%%%%%%%%%%%%%%%%% Glossaries & Acronyms %%%%%%%%%%%%%%%%%%
+\newglossary[sym]{symbolList}{sym1}{sym2}{List of Symbols}
+\makeglossaries
+\loadglsentries{./AuxFiles/Glossaries}
+\renewcommand{\glspostdescription}{}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%% Bibliography %%%%%%%%%%%%%%%%%%%%%
+\usepackage[backend=bibtex,style=ieee]{biblatex}
+\addbibresource{./AuxFiles/ProjectBib.bib}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%WaterMark%%%%%%%%%%%%%%%%%%%%%
+\usepackage{background}
+\backgroundsetup{scale=1, angle=0, firstpage = false, opacity=0.5, contents={
+\begin{tikzpicture}[remember picture, overlay]
+\node at ([yshift=0pt, xshift=0pt]current page.center){\includegraphics[width=0.6\textwidth]{Figures/RVlogoVecW}};
+\end{tikzpicture}
+}}
+
+\begin{document}
+	\NoBgThispage
+	\maketitle
+	\newpage
+	\ifDrf
+	\else
+	\begin{spacing}{1.5}
+		\input{./CoverPages/Certificate}
+
+		\newpage
+		\input{./CoverPages/Declaration}
+
+		\newpage
+		\input{./CoverPages/Ack}
+
+		\newpage
+		\pagenumbering{roman}
+
+		\chapter*{Abstract}
+		\input{./CoverPages/Abstract}
+
+	\end{spacing}
+	\newpage
+	\pagestyle{fplain}
+	\begin{spacing}{1.5}
+		\tableofcontents
+	\end{spacing}
+	\newpage
+	\begin{spacing}{1.5}
+		\cleardoublepage
+		\addcontentsline{toc}{chapter}{\listfigurename}
+		\listoffigures
+	\end{spacing}
+	\newpage
+	\begin{spacing}{1.5}
+		\cleardoublepage
+		\addcontentsline{toc}{chapter}{\listtablename}
+		\listoftables
+	\end{spacing}
+
+	\printglossary[type=\acronymtype, title= Abbreviations, toctitle=Abbreviations]
+
+	\printglossary[type=symbolList, title= List of Symbols, toctitle=List of Symbols]
+	\fi
+	\mainmatter
+	\pagestyle{mplain}
+	\glsresetall
+	\begin{spacing}{1.5}
+		%Chapter 1
+		\input{./Chapter1/chapter1-Intro}
+
+		%Chapter 2
+		\input{./Chapter2/chapter2-litsurvey}
+
+		%Chapter 3
+		\input{./Chapter2/chapter2-Funda}
+
+		%Chapter 4
+		\input{./Chapter4/chapter4-srs}
+
+		%Chapter 5
+		\input{./Chapter3/chapter3-design}
+
+		%Chapter 6
+		\input{./Chapter4/chapter4-implement}
+
+		%Chapter 7
+		\input{./Chapter7/chapter7-testing}
+
+		%Chapter 8
+		\input{./Chapter5/chapter5-result}
+
+		%Chapter 9
+		\input{./Chapter6/chapter6-conclution}
+
+		%% Appendix chapters
+		\appendix
+		\input{./Appendix/ApndxA}
+		\input{./Appendix/ApndxB}
+		\input{./Appendix/ApndxC}
+
+		\backmatter
+		\ifDrf
+		\else
+		\clearpage
+		\addcontentsline{toc}{chapter}{Bibliography}
+		\printbibliography%
+		\fi
+	\end{spacing}
+\end{document}

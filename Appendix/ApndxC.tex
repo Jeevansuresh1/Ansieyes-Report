@@ -1,0 +1,162 @@
+\chapter{Algorithms}
+
+This appendix presents the key algorithms used in Ansieyes in pseudocode form. Due to the corporate nature of the project, actual source code has been omitted in favour of algorithmic descriptions.
+
+\section{Issue Analysis Pipeline}
+
+\begin{tcblisting}{listing only,colback=gray!10!white, breakable, boxsep=0pt,top=1mm,bottom=1mm,left=1mm,right=1mm,
+listing options={
+basicstyle=\small\ttfamily,
+commentstyle=\color{gray},
+backgroundcolor=\color{gray!25}}}
+ALGORITHM: AnalyseIssue(title, description, codebase, retries)
+--------------------------------------------------------------
+INPUT:  Issue title, description, codebase text, max retries
+OUTPUT: Structured analysis (type, severity, root cause, solutions)
+
+1. Load codebase content from Repomix output file
+2. Build prompt = SystemRole + title + description + codebase
+                  + JSON format instructions
+3. FOR attempt = 0 TO retries DO
+     response = CallGeminiAPI(prompt)
+     json_data = ExtractJSON(response)   -- try 3 strategies
+     IF json_data is valid THEN
+       analysis = ParseToModel(json_data)
+     ELSE
+       analysis = FallbackTextExtraction(response)
+     END IF
+     IF IsHighQuality(analysis) THEN
+       RETURN analysis
+     END IF
+   END FOR
+4. RETURN best available analysis
+\end{tcblisting}
+
+\section{Quality Validation}
+
+\begin{tcblisting}{listing only,colback=gray!10!white, breakable, boxsep=0pt,top=1mm,bottom=1mm,left=1mm,right=1mm,
+listing options={
+basicstyle=\small\ttfamily,
+commentstyle=\color{gray},
+backgroundcolor=\color{gray!25}}}
+ALGORITHM: IsHighQuality(analysis)
+----------------------------------
+INPUT:  Parsed analysis object
+OUTPUT: Boolean (true if acceptable quality)
+
+IF count(analysis.solutions) < 1       THEN RETURN false
+IF analysis.confidence < 0.3           THEN RETURN false
+IF analysis.summary.length < 20        THEN RETURN false
+IF analysis.primary_cause.length < 10  THEN RETURN false
+IF any file path contains "path/to/"   THEN RETURN false
+IF any file path contains "example.py" THEN RETURN false
+IF any solution description < 10 chars THEN RETURN false
+RETURN true
+\end{tcblisting}
+
+\section{Prompt Injection Detection}
+
+\begin{tcblisting}{listing only,colback=gray!10!white, breakable, boxsep=0pt,top=1mm,bottom=1mm,left=1mm,right=1mm,
+listing options={
+basicstyle=\small\ttfamily,
+commentstyle=\color{gray},
+backgroundcolor=\color{gray!25}}}
+ALGORITHM: DetectInjection(text)
+--------------------------------
+INPUT:  Issue text to evaluate
+OUTPUT: Risk level, confidence, detected patterns
+
+-- Layer 1: ML-based
+ml_score = PytectorModel.classify(text)
+ml_detected = (ml_score > 0.5)
+
+-- Layer 2: Pattern matching across 7 categories
+patterns_found = []
+FOR each category in [role, system, bypass, file,
+                      code, extraction, leakage] DO
+  FOR each regex in category.patterns DO
+    IF regex matches text THEN
+      patterns_found.add(category)
+    END IF
+  END FOR
+END FOR
+pattern_score = lookup_confidence(patterns_found)
+
+-- Layer 3: Heuristic analysis
+heuristic_score = 0
+IF special_char_sequences(text) > 3    THEN score += 0.6
+IF instruction_keywords(text) > 3      THEN score += 0.7
+IF suspicious_delimiters(text) > 2     THEN score += 0.5
+IF max_sentence_length(text) > 100     THEN score += 0.4
+
+-- Aggregate
+final_confidence = MAX(ml_score, pattern_score,
+                       heuristic_score)
+pattern_count = len(unique(patterns_found))
+risk = ClassifyRisk(final_confidence, pattern_count)
+RETURN InjectionResult(risk, final_confidence, patterns)
+\end{tcblisting}
+
+\section{Cosine Similarity Duplicate Detection}
+
+\begin{tcblisting}{listing only,colback=gray!10!white, breakable, boxsep=0pt,top=1mm,bottom=1mm,left=1mm,right=1mm,
+listing options={
+basicstyle=\small\ttfamily,
+commentstyle=\color{gray},
+backgroundcolor=\color{gray!25}}}
+ALGORITHM: CosineDuplicateDetect(new_title, new_desc,
+                                 existing_issues, threshold)
+-----------------------------------------------------
+INPUT:  New issue title and description,
+        list of existing issues, threshold (default 0.6)
+OUTPUT: Duplicate detection result
+
+1. FOR each issue (new + existing) DO
+     text = lowercase(title + " " + title + " " + desc)
+     text = remove_special_chars(text)
+     text = normalise_whitespace(text)
+   END FOR
+2. Build TF-IDF matrix using unigrams and bigrams
+   (max 5000 features, English stop words removed)
+3. Compute cosine similarity between new issue
+   vector and all existing issue vectors
+4. Find max_similarity and best_match_index
+5. IF max_similarity >= threshold THEN
+     confidence = MIN(max_similarity * 1.2, 1.0)
+     RETURN DuplicateResult(true, existing[best_match],
+                            max_similarity, confidence)
+   ELSE
+     RETURN DuplicateResult(false, null,
+                            max_similarity, max_similarity)
+   END IF
+\end{tcblisting}
+
+\section{Librarian File Selection}
+
+\begin{tcblisting}{listing only,colback=gray!10!white, breakable, boxsep=0pt,top=1mm,bottom=1mm,left=1mm,right=1mm,
+listing options={
+basicstyle=\small\ttfamily,
+commentstyle=\color{gray},
+backgroundcolor=\color{gray!25}}}
+ALGORITHM: LibrarianFileSelection(title, desc, chunks)
+------------------------------------------------------
+INPUT:  Issue title, description, directory chunks
+OUTPUT: List of relevant file paths
+
+1. Load all .txt files from chunks directory
+2. Send directory list to Gemini:
+   "Which directories are relevant to this issue?"
+3. Validate returned directory names against loaded chunks
+4. FOR each relevant chunk DO
+     Send chunk content to Gemini:
+     "Which files in this directory are relevant?"
+     FOR each returned path DO
+       IF path has "/" AND has extension
+          AND length < 200
+          AND not a comment line THEN
+         Add to relevant_files set
+       END IF
+     END FOR
+   END FOR
+5. RETURN relevant_files
+\end{tcblisting}
